@@ -47,11 +47,23 @@ export function useCategoryMappings() {
     });
   }, []);
 
+  /** Rename all mapping values from oldCategory to newCategory */
+  const renameMappingsCategory = useCallback((oldCategory, newCategory) => {
+    setMappings((prev) => {
+      const updated = {};
+      for (const [desc, cat] of Object.entries(prev)) {
+        updated[desc] = cat === oldCategory ? newCategory : cat;
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   /** Wipe all saved mappings */
   const clearMappings = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     setMappings({});
   }, []);
 
-  return { mappings, addMapping, addMappings, removeMapping, clearMappings };
+  return { mappings, addMapping, addMappings, removeMapping, renameMappingsCategory, clearMappings };
 }

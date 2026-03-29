@@ -37,5 +37,16 @@ export function useCustomCategories() {
     });
   };
 
-  return { customCategories, addCustomCategory, removeCustomCategory };
+  const renameCustomCategory = (oldName, newName) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setCustomCategories((prev) => {
+      if (prev.includes(trimmed)) return prev;
+      const next = prev.map((c) => (c === oldName ? trimmed : c));
+      save(next);
+      return next;
+    });
+  };
+
+  return { customCategories, addCustomCategory, removeCustomCategory, renameCustomCategory };
 }

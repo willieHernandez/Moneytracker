@@ -19,8 +19,8 @@ export default function App() {
   const [detectedCols, setDetectedCols] = useState({ date: -1, description: -1, amount: -1 });
   const [expenses, setExpenses] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const { customCategories, addCustomCategory, removeCustomCategory } = useCustomCategories();
-  const { mappings, addMapping, addMappings, clearMappings } = useCategoryMappings();
+  const { customCategories, addCustomCategory, removeCustomCategory, renameCustomCategory } = useCustomCategories();
+  const { mappings, addMapping, addMappings, renameMappingsCategory, clearMappings } = useCategoryMappings();
 
   // --- CSV Upload ---
   const handleUpload = useCallback(async (file) => {
@@ -77,6 +77,15 @@ export default function App() {
       prev.map((e) => e.category === name ? { ...e, category: undefined } : e)
     );
   }, [removeCustomCategory]);
+
+  // --- Rename a custom category (update expenses + saved rules) ---
+  const handleRenameCategory = useCallback((oldName, newName) => {
+    renameCustomCategory(oldName, newName);
+    renameMappingsCategory(oldName, newName);
+    setExpenses((prev) =>
+      prev.map((e) => e.category === oldName ? { ...e, category: newName } : e)
+    );
+  }, [renameCustomCategory, renameMappingsCategory]);
 
   // --- Reset to upload a new file ---
   const handleNewUpload = () => {
@@ -171,6 +180,7 @@ export default function App() {
           customCategories={customCategories}
           onAddCategory={handleAddCategory}
           onRemoveCategory={handleRemoveCategory}
+          onRenameCategory={handleRenameCategory}
         />
 
         {/* Uncategorized panel — shown prominently if there are any */}

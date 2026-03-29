@@ -45,6 +45,10 @@ src/
     categoryMatcher.js          # Mapping lookup, bulk apply, category totals
 ```
 
+## Plans
+
+All approved plans must be saved to `docs/plans/` before implementation begins. Use a short kebab-case filename that describes the feature (e.g. `docs/plans/add-dark-mode.md`).
+
 ## After Completing Work
 
 Rebuild the app and redeploy to the `gh-pages` branch so the live site at `https://williehernandez.github.io/Moneytracker/` stays up to date.

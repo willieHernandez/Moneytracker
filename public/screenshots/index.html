@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Expense Tracker — Screenshots</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f1f5f9; padding: 32px; }
+    h1 { font-size: 1.5rem; font-weight: 700; color: #1e293b; margin-bottom: 8px; }
+    p { color: #64748b; margin-bottom: 32px; font-size: 0.9rem; }
+    .grid { display: flex; flex-direction: column; gap: 40px; }
+    .card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .card-header { padding: 14px 20px; border-bottom: 1px solid #e2e8f0; }
+    .card-header h2 { font-size: 0.95rem; font-weight: 600; color: #334155; }
+    .card-header p { font-size: 0.82rem; color: #94a3b8; margin: 0; }
+    .card img { width: 100%; display: block; }
+  </style>
+</head>
+<body>
+  <h1>Expense Tracker — UI Screenshots</h1>
+  <p>Captured via Playwright. Open the app at <a href="http://localhost:5173">localhost:5173</a>.</p>
+  <div class="grid">
+    <div class="card">
+      <div class="card-header"><h2>1. Upload Screen</h2><p>Landing page with drag &amp; drop CSV upload</p></div>
+      <img src="01-upload.png" alt="Upload screen" />
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>2. Dashboard — After Upload (First Run)</h2><p>All transactions land in the Needs Categorization panel</p></div>
+      <img src="02-dashboard-top.png" alt="Dashboard after upload" />
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>3. Categorization Panel — Filled</h2><p>Each transaction gets a category assigned before applying</p></div>
+      <img src="04-categorization-filled.png" alt="Categorization panel filled" />
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>4. Dashboard — Fully Categorized (Top)</h2><p>Stats cards, bar chart, and category filter pills</p></div>
+      <img src="05-fully-categorized.png" alt="Fully categorized dashboard" />
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>5. Dashboard — Full Page View</h2><p>Includes the complete transactions table with colored category badges</p></div>
+      <img src="06-fully-categorized-full.png" alt="Full page dashboard" />
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>6. Filtered by Food &amp; Dining</h2><p>Clicking a category pill highlights the chart bar and filters the table</p></div>
+      <img src="07-filtered-food.png" alt="Filtered by Food and Dining" />
+    </div>
+  </div>
+</body>
+</html>

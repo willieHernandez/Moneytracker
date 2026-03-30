@@ -3,27 +3,106 @@ import CSVUpload from './components/CSVUpload';
 import ColumnMapper from './components/ColumnMapper';
 import CategorySummary from './components/CategorySummary';
 import CategoryManager from './components/CategoryManager';
+import BudgetManager from './components/BudgetManager';
+import MonthlyHistory from './components/MonthlyHistory';
 import ExpenseList from './components/ExpenseList';
 import CategorizationPanel from './components/CategorizationPanel';
+import AuthScreen from './components/AuthScreen';
 import { useCategoryMappings } from './hooks/useCategoryMappings';
 import { useCustomCategories } from './hooks/useCustomCategories';
+import { useAuth } from './hooks/useAuth';
+import { useBudgets } from './hooks/useBudgets';
+import { useMonthlyHistory } from './hooks/useMonthlyHistory';
 import { parseCSV, detectColumns, processRows } from './utils/csvParser';
 import { applyMappings, getCategoryTotals } from './utils/categoryMatcher';
+import { generateSnapshotLabel } from './utils/snapshotUtils';
 import { DEFAULT_CATEGORIES } from './data/defaultCategories';
 
 // view: 'upload' | 'columnMapping' | 'dashboard'
 
 export default function App() {
+  // =====================
+  // All hooks must be called unconditionally at the top
+  // =====================
+  const { isAuthenticated, hasAccount, authError, login, createAccount, logout, deleteAccount, getUsername } = useAuth();
+
   const [view, setView] = useState('upload');
-  const [rawRows, setRawRows] = useState([]); // all rows including header
+  const [rawRows, setRawRows] = useState([]);
   const [detectedCols, setDetectedCols] = useState({ date: -1, description: -1, amount: -1 });
   const [expenses, setExpenses] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const { customCategories, addCustomCategory, removeCustomCategory, renameCustomCategory } = useCustomCategories();
-  const { mappings, addMapping, addMappings, renameMappingsCategory, clearMappings } = useCategoryMappings();
+  const [savedFlash, setSavedFlash] = useState(false);
 
-  // --- CSV Upload ---
-  const handleUpload = useCallback(async (file) => {
+  const { customCategories, addCustomCategory, removeCustomCategory, renameCustomCategory } = useCustomCategories();
+  const { mappings, addMapping, renameMappingsCategory, clearMappings } = useCategoryMappings();
+  const { budgets, setBudget, removeBudget } = useBudgets();
+  const { history, saveSnapshot, deleteSnapshot } = useMonthlyHistory();
+
+  // Derived data (computed before callbacks so they can be deps)
+  const totals = getCategoryTotals(expenses);
+  const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...customCategories])].sort();
+  const uncategorized = expenses.filter((e) => !e.category);
+
+  // =====================
+  // Callbacks (all useCallback must be before any conditional return)
+  // =====================
+  const handleCategorizeAll = useCallback((description, category, saveRule) => {
+    setExpenses((prev) =>
+      prev.map((e) => e.description === description ? { ...e, category } : e)
+    );
+    if (saveRule) addMapping(description, category);
+  }, [addMapping]);
+
+  const handleAddCategory = useCallback((name) => {
+    addCustomCategory(name);
+  }, [addCustomCategory]);
+
+  const handleRemoveCategory = useCallback((name) => {
+    removeCustomCategory(name);
+    setExpenses((prev) =>
+      prev.map((e) => e.category === name ? { ...e, category: undefined } : e)
+    );
+  }, [removeCustomCategory]);
+
+  const handleRenameCategory = useCallback((oldName, newName) => {
+    renameCustomCategory(oldName, newName);
+    renameMappingsCategory(oldName, newName);
+    setExpenses((prev) =>
+      prev.map((e) => e.category === oldName ? { ...e, category: newName } : e)
+    );
+    if (budgets[oldName] != null) {
+      setBudget(newName, budgets[oldName]);
+      removeBudget(oldName);
+    }
+  }, [renameCustomCategory, renameMappingsCategory, budgets, setBudget, removeBudget]);
+
+  const handleSaveSnapshot = useCallback(() => {
+    const { label, dateRange } = generateSnapshotLabel(expenses);
+    const totalSpent = expenses.reduce((s, e) => s + Math.abs(e.amount), 0);
+    saveSnapshot({ label, dateRange, totals, transactionCount: expenses.length, totalSpent });
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 2000);
+  }, [expenses, totals, saveSnapshot]);
+
+  // =====================
+  // Auth gate (after all hooks)
+  // =====================
+  if (!isAuthenticated) {
+    return (
+      <AuthScreen
+        hasAccount={hasAccount}
+        onLogin={login}
+        onCreateAccount={createAccount}
+        onDeleteAccount={deleteAccount}
+        authError={authError}
+      />
+    );
+  }
+
+  // =====================
+  // Non-hook handlers (safe after conditional return)
+  // =====================
+  const handleUpload = async (file) => {
     const rows = await parseCSV(file);
     if (rows.length < 2) return;
     const [headers, ...dataRows] = rows;
@@ -32,62 +111,23 @@ export default function App() {
     setDetectedCols(cols);
 
     if (cols.date >= 0 && cols.description >= 0 && cols.amount >= 0) {
-      // Auto-detected — process immediately
       const processed = processRows(dataRows, cols);
       const withCategories = applyMappings(processed, mappings);
       setExpenses(withCategories);
       setView('dashboard');
     } else {
-      // Need user to map columns
       setView('columnMapping');
     }
-  }, [mappings]);
+  };
 
-  // --- Column Mapping confirmed ---
-  const handleColumnConfirm = useCallback((colMap) => {
+  const handleColumnConfirm = (colMap) => {
     const [, ...dataRows] = rawRows;
     const processed = processRows(dataRows, colMap);
     const withCategories = applyMappings(processed, mappings);
     setExpenses(withCategories);
     setView('dashboard');
-  }, [rawRows, mappings]);
+  };
 
-  // --- Categorize a description (applies to all matching expenses) ---
-  const handleCategorizeAll = useCallback((description, category, saveRule) => {
-    setExpenses((prev) =>
-      prev.map((e) =>
-        e.description === description ? { ...e, category } : e
-      )
-    );
-
-    if (saveRule) {
-      addMapping(description, category);
-    }
-  }, [addMapping]);
-
-  // --- Add a new custom category ---
-  const handleAddCategory = useCallback((name) => {
-    addCustomCategory(name);
-  }, [addCustomCategory]);
-
-  // --- Remove a custom category (uncategorize any transactions using it) ---
-  const handleRemoveCategory = useCallback((name) => {
-    removeCustomCategory(name);
-    setExpenses((prev) =>
-      prev.map((e) => e.category === name ? { ...e, category: undefined } : e)
-    );
-  }, [removeCustomCategory]);
-
-  // --- Rename a custom category (update expenses + saved rules) ---
-  const handleRenameCategory = useCallback((oldName, newName) => {
-    renameCustomCategory(oldName, newName);
-    renameMappingsCategory(oldName, newName);
-    setExpenses((prev) =>
-      prev.map((e) => e.category === oldName ? { ...e, category: newName } : e)
-    );
-  }, [renameCustomCategory, renameMappingsCategory]);
-
-  // --- Reset to upload a new file ---
   const handleNewUpload = () => {
     setExpenses([]);
     setRawRows([]);
@@ -95,19 +135,41 @@ export default function App() {
     setView('upload');
   };
 
-  // =====================
-  // Derived data
-  // =====================
-  const uncategorized = expenses.filter((e) => !e.category);
-  const categorized = expenses.filter((e) => e.category);
-  const totals = getCategoryTotals(expenses);
-  const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...customCategories])].sort();
+  const username = getUsername();
 
   // =====================
   // Render
   // =====================
   if (view === 'upload') {
-    return <CSVUpload onUpload={handleUpload} />;
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h1 className="text-lg font-bold text-gray-900">Expense Tracker</h1>
+              {username && (
+                <>
+                  <span className="text-gray-300 select-none">|</span>
+                  <span className="text-sm text-gray-500">Hi, <strong className="text-gray-700">{username}</strong></span>
+                </>
+              )}
+            </div>
+            <button
+              onClick={logout}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
+        </header>
+        <CSVUpload onUpload={handleUpload} />
+      </div>
+    );
   }
 
   if (view === 'columnMapping') {
@@ -136,12 +198,33 @@ export default function App() {
               </svg>
             </div>
             <h1 className="text-lg font-bold text-gray-900">Expense Tracker</h1>
+            {username && (
+              <>
+                <span className="text-gray-300 select-none">|</span>
+                <span className="text-sm text-gray-500">Hi, <strong className="text-gray-700">{username}</strong></span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {Object.keys(mappings).length > 0 && (
               <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
                 {Object.keys(mappings).length} saved rule{Object.keys(mappings).length !== 1 ? 's' : ''}
               </span>
+            )}
+            {expenses.length > 0 && (
+              <button
+                onClick={handleSaveSnapshot}
+                className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium transition-colors ${
+                  savedFlash
+                    ? 'border-green-300 bg-green-50 text-green-600'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+                {savedFlash ? 'Saved!' : 'Save Snapshot'}
+              </button>
             )}
             <button
               onClick={handleNewUpload}
@@ -161,21 +244,26 @@ export default function App() {
                 Clear Rules
               </button>
             )}
+            <button
+              onClick={logout}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+            >
+              Sign out
+            </button>
           </div>
         </div>
       </header>
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {/* Summary + Chart */}
         <CategorySummary
           expenses={expenses}
           totals={totals}
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
+          budgets={budgets}
         />
 
-        {/* Category management */}
         <CategoryManager
           customCategories={customCategories}
           onAddCategory={handleAddCategory}
@@ -183,7 +271,18 @@ export default function App() {
           onRenameCategory={handleRenameCategory}
         />
 
-        {/* Uncategorized panel — shown prominently if there are any */}
+        <BudgetManager
+          budgets={budgets}
+          allCategories={allCategories}
+          onSetBudget={setBudget}
+          onRemoveBudget={removeBudget}
+        />
+
+        <MonthlyHistory
+          history={history}
+          onDelete={deleteSnapshot}
+        />
+
         {uncategorized.length > 0 && (
           <CategorizationPanel
             uncategorized={uncategorized}
@@ -200,7 +299,6 @@ export default function App() {
           />
         )}
 
-        {/* Expense list */}
         <ExpenseList
           expenses={expenses}
           selectedCategory={selectedCategory}

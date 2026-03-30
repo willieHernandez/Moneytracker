@@ -101,7 +101,7 @@ export default function CategoriesPage({
               const ruleCount = mappingCounts[cat] || 0;
 
               return (
-                <tr key={cat} className="hover:bg-gray-50 transition-colors group">
+                <tr key={cat} className="hover:bg-gray-50 transition-colors">
                   {/* Color dot */}
                   <td className="px-5 py-3.5">
                     <span
@@ -183,7 +183,7 @@ export default function CategoriesPage({
                   {/* Actions */}
                   <td className="px-4 py-3.5 text-right">
                     {isCustom && !isEditing && (
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => startEdit(cat)}
                           className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:bg-blue-50 hover:text-blue-500 transition-colors"

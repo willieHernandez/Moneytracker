@@ -2,9 +2,11 @@ import { useState, useCallback } from 'react';
 import CSVUpload from './components/CSVUpload';
 import ColumnMapper from './components/ColumnMapper';
 import CategorySummary from './components/CategorySummary';
+import CategoryManager from './components/CategoryManager';
 import ExpenseList from './components/ExpenseList';
 import CategorizationPanel from './components/CategorizationPanel';
 import { useCategoryMappings } from './hooks/useCategoryMappings';
+import { useCustomCategories } from './hooks/useCustomCategories';
 import { parseCSV, detectColumns, processRows } from './utils/csvParser';
 import { applyMappings, getCategoryTotals } from './utils/categoryMatcher';
 import { DEFAULT_CATEGORIES } from './data/defaultCategories';
@@ -17,8 +19,8 @@ export default function App() {
   const [detectedCols, setDetectedCols] = useState({ date: -1, description: -1, amount: -1 });
   const [expenses, setExpenses] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [extraCategories, setExtraCategories] = useState([]);
-  const { mappings, addMapping, addMappings, clearMappings } = useCategoryMappings();
+  const { customCategories, addCustomCategory, removeCustomCategory, renameCustomCategory } = useCustomCategories();
+  const { mappings, addMapping, addMappings, renameMappingsCategory, clearMappings } = useCategoryMappings();
 
   // --- CSV Upload ---
   const handleUpload = useCallback(async (file) => {
@@ -52,14 +54,6 @@ export default function App() {
 
   // --- Categorize a description (applies to all matching expenses) ---
   const handleCategorizeAll = useCallback((description, category, saveRule) => {
-    // null description = user just adding a new category
-    if (description === null) {
-      if (!extraCategories.includes(category)) {
-        setExtraCategories((prev) => [...prev, category]);
-      }
-      return;
-    }
-
     setExpenses((prev) =>
       prev.map((e) =>
         e.description === description ? { ...e, category } : e
@@ -69,11 +63,29 @@ export default function App() {
     if (saveRule) {
       addMapping(description, category);
     }
+  }, [addMapping]);
 
-    if (!extraCategories.includes(category) && !DEFAULT_CATEGORIES.includes(category)) {
-      setExtraCategories((prev) => [...prev, category]);
-    }
-  }, [addMapping, extraCategories]);
+  // --- Add a new custom category ---
+  const handleAddCategory = useCallback((name) => {
+    addCustomCategory(name);
+  }, [addCustomCategory]);
+
+  // --- Remove a custom category (uncategorize any transactions using it) ---
+  const handleRemoveCategory = useCallback((name) => {
+    removeCustomCategory(name);
+    setExpenses((prev) =>
+      prev.map((e) => e.category === name ? { ...e, category: undefined } : e)
+    );
+  }, [removeCustomCategory]);
+
+  // --- Rename a custom category (update expenses + saved rules) ---
+  const handleRenameCategory = useCallback((oldName, newName) => {
+    renameCustomCategory(oldName, newName);
+    renameMappingsCategory(oldName, newName);
+    setExpenses((prev) =>
+      prev.map((e) => e.category === oldName ? { ...e, category: newName } : e)
+    );
+  }, [renameCustomCategory, renameMappingsCategory]);
 
   // --- Reset to upload a new file ---
   const handleNewUpload = () => {
@@ -89,7 +101,7 @@ export default function App() {
   const uncategorized = expenses.filter((e) => !e.category);
   const categorized = expenses.filter((e) => e.category);
   const totals = getCategoryTotals(expenses);
-  const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...extraCategories])].sort();
+  const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...customCategories])].sort();
 
   // =====================
   // Render
@@ -163,6 +175,14 @@ export default function App() {
           onSelectCategory={setSelectedCategory}
         />
 
+        {/* Category management */}
+        <CategoryManager
+          customCategories={customCategories}
+          onAddCategory={handleAddCategory}
+          onRemoveCategory={handleRemoveCategory}
+          onRenameCategory={handleRenameCategory}
+        />
+
         {/* Uncategorized panel — shown prominently if there are any */}
         {uncategorized.length > 0 && (
           <CategorizationPanel
@@ -176,6 +196,7 @@ export default function App() {
               if (saveRule && expense) addMapping(expense.description, category);
             }}
             onCategorizeAll={handleCategorizeAll}
+            onAddCategory={handleAddCategory}
           />
         )}
 

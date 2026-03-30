@@ -41,7 +41,7 @@ const CustomTooltip = ({ active, payload }) => {
   );
 };
 
-export default function CategorySummary({ expenses, totals, selectedCategory, onSelectCategory }) {
+export default function CategorySummary({ expenses, totals, selectedCategory, onSelectCategory, budgets = {} }) {
   const totalSpent = expenses.reduce((s, e) => s + Math.abs(e.amount), 0);
   const totalTransactions = expenses.length;
   const categorizedCount = expenses.filter((e) => e.category).length;
@@ -107,6 +107,38 @@ export default function CategorySummary({ expenses, totals, selectedCategory, on
                 Clear filter
               </button>
             </p>
+          )}
+
+          {/* Budget progress bars */}
+          {chartData.some((d) => budgets[d.category] != null) && (
+            <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Budget Progress</p>
+              {chartData
+                .filter((d) => budgets[d.category] != null)
+                .map((d) => {
+                  const budget = budgets[d.category];
+                  const pct = Math.min(100, (d.total / budget) * 100);
+                  const over = d.total > budget;
+                  const barColor = over ? 'bg-red-500' : pct >= 80 ? 'bg-amber-400' : 'bg-blue-500';
+                  return (
+                    <div key={d.category}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-600">{d.category}</span>
+                        <span className={`text-xs font-medium ${over ? 'text-red-600' : 'text-gray-500'}`}>
+                          {formatCurrency(d.total)} / {formatCurrency(budget)}
+                          {over && <span className="ml-1 text-red-500">▲ over by {formatCurrency(d.total - budget)}</span>}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full transition-all ${barColor}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
           )}
         </div>
       )}

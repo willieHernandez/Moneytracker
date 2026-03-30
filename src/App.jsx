@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import CSVUpload from './components/CSVUpload';
 import ColumnMapper from './components/ColumnMapper';
 import CategorySummary from './components/CategorySummary';
@@ -21,6 +21,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const { customCategories, addCustomCategory, removeCustomCategory, renameCustomCategory } = useCustomCategories();
   const { mappings, addMapping, addMappings, renameMappingsCategory, clearMappings } = useCategoryMappings();
+  const importInputRef = useRef(null);
 
   // --- CSV Upload ---
   const handleUpload = useCallback(async (file) => {
@@ -86,6 +87,46 @@ export default function App() {
       prev.map((e) => e.category === oldName ? { ...e, category: newName } : e)
     );
   }, [renameCustomCategory, renameMappingsCategory]);
+
+  // --- Export profile as JSON download ---
+  const handleExportProfile = useCallback(() => {
+    const profile = {
+      version: '1',
+      exported: new Date().toISOString(),
+      mappings,
+      customCategories,
+    };
+    const blob = new Blob([JSON.stringify(profile, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `moneytracker-profile-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [mappings, customCategories]);
+
+  // --- Import profile from JSON file (merges into existing) ---
+  const handleImportProfile = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const profile = JSON.parse(ev.target.result);
+        if (!profile.mappings || typeof profile.mappings !== 'object') {
+          alert('Invalid profile file.');
+          return;
+        }
+        const pairs = Object.entries(profile.mappings).map(([description, category]) => ({ description, category }));
+        if (pairs.length) addMappings(pairs);
+        (profile.customCategories || []).forEach(addCustomCategory);
+      } catch {
+        alert('Could not read profile file.');
+      }
+    };
+    reader.readAsText(file);
+  }, [addMappings, addCustomCategory]);
 
   // --- Reset to upload a new file ---
   const handleNewUpload = () => {
@@ -161,6 +202,29 @@ export default function App() {
                 Clear Rules
               </button>
             )}
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={handleImportProfile}
+            />
+            {(Object.keys(mappings).length > 0 || customCategories.length > 0) && (
+              <button
+                onClick={handleExportProfile}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-500 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition-colors"
+                title="Export profile as JSON"
+              >
+                Export Profile
+              </button>
+            )}
+            <button
+              onClick={() => importInputRef.current?.click()}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-500 hover:bg-green-50 hover:border-green-200 hover:text-green-600 transition-colors"
+              title="Import profile from JSON"
+            >
+              Import Profile
+            </button>
           </div>
         </div>
       </header>

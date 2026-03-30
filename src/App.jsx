@@ -7,6 +7,7 @@ import ExpenseList from './components/ExpenseList';
 import CategorizationPanel from './components/CategorizationPanel';
 import { useCategoryMappings } from './hooks/useCategoryMappings';
 import { useCustomCategories } from './hooks/useCustomCategories';
+import { useHiddenDefaults } from './hooks/useHiddenDefaults';
 import { parseCSV, detectColumns, processRows } from './utils/csvParser';
 import { applyMappings, getCategoryTotals } from './utils/categoryMatcher';
 import { DEFAULT_CATEGORIES } from './data/defaultCategories';
@@ -21,6 +22,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const { customCategories, addCustomCategory, removeCustomCategory, renameCustomCategory } = useCustomCategories();
   const { mappings, addMapping, addMappings, renameMappingsCategory, clearMappings } = useCategoryMappings();
+  const { hiddenDefaults, hideDefault } = useHiddenDefaults();
   const importInputRef = useRef(null);
 
   // --- CSV Upload ---
@@ -71,22 +73,31 @@ export default function App() {
     addCustomCategory(name);
   }, [addCustomCategory]);
 
-  // --- Remove a custom category (uncategorize any transactions using it) ---
+  // --- Remove a category (uncategorize any transactions using it) ---
   const handleRemoveCategory = useCallback((name) => {
-    removeCustomCategory(name);
+    if (DEFAULT_CATEGORIES.includes(name)) {
+      hideDefault(name);
+    } else {
+      removeCustomCategory(name);
+    }
     setExpenses((prev) =>
       prev.map((e) => e.category === name ? { ...e, category: undefined } : e)
     );
-  }, [removeCustomCategory]);
+  }, [removeCustomCategory, hideDefault]);
 
-  // --- Rename a custom category (update expenses + saved rules) ---
+  // --- Rename a category (update expenses + saved rules) ---
   const handleRenameCategory = useCallback((oldName, newName) => {
-    renameCustomCategory(oldName, newName);
+    if (DEFAULT_CATEGORIES.includes(oldName)) {
+      hideDefault(oldName);
+      addCustomCategory(newName);
+    } else {
+      renameCustomCategory(oldName, newName);
+    }
     renameMappingsCategory(oldName, newName);
     setExpenses((prev) =>
       prev.map((e) => e.category === oldName ? { ...e, category: newName } : e)
     );
-  }, [renameCustomCategory, renameMappingsCategory]);
+  }, [removeCustomCategory, hideDefault, addCustomCategory, renameCustomCategory, renameMappingsCategory]);
 
   // --- Export profile as JSON download ---
   const handleExportProfile = useCallback(() => {
@@ -142,7 +153,8 @@ export default function App() {
   const uncategorized = expenses.filter((e) => !e.category);
   const categorized = expenses.filter((e) => e.category);
   const totals = getCategoryTotals(expenses);
-  const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...customCategories])].sort();
+  const activeDefaults = DEFAULT_CATEGORIES.filter((c) => !hiddenDefaults.includes(c));
+  const allCategories = [...new Set([...activeDefaults, ...customCategories])].sort();
 
   // =====================
   // Shared header (dashboard + categories views)
@@ -266,6 +278,7 @@ export default function App() {
         <main className="max-w-7xl mx-auto px-6 py-8">
           <CategoriesPage
             customCategories={customCategories}
+            activeDefaults={activeDefaults}
             expenses={expenses}
             mappings={mappings}
             onAddCategory={handleAddCategory}

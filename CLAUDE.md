@@ -45,6 +45,17 @@ src/
     categoryMatcher.js          # Mapping lookup, bulk apply, category totals
 ```
 
+## Design Principles
+
+This app is used **primarily on mobile devices**. Mobile-first design is a hard requirement, not an afterthought.
+
+- **Mobile-first Tailwind classes** — start with base (mobile) styles, layer `sm:`/`md:` breakpoints for larger screens
+- **Touch targets** — buttons and interactive elements must be large enough to tap comfortably (minimum 44×44px)
+- **No hover-only interactions** — never hide critical actions (edit, delete, etc.) behind hover states; they must be visible and tappable at all times
+- **Readable text** — minimum `text-sm` (14px) for body content; avoid tiny labels
+- **Single-column layouts by default** — stack vertically on mobile, expand to multi-column on larger screens only when it improves readability
+- **Avoid horizontal overflow** — tables and wide content must scroll horizontally or reflow rather than clip
+
 ## Plans
 
 All approved plans must be saved to `docs/plans/` before implementation begins. Use a short kebab-case filename that describes the feature (e.g. `docs/plans/add-dark-mode.md`).
